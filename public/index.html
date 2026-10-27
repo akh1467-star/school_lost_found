@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>우리학교 분실물함</title>
+<meta name="description" content="교무실 분실물함에 보관 중인 물건을 확인하세요.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>우리학교 분실물함</h1>
+      <p class="sub" id="sub">잃어버린 물건, 교무실 분실물함에 있는지 먼저 확인하세요.</p>
+    </div>
+  </header>
+
+  <!-- 학생용 -->
+  <section id="v-stu" style="display:flex;flex-direction:column;gap:16px">
+    <div class="rule">
+      <span><b>보관 기간</b> 들어온 날부터 7일 (월요일에 들어온 물건은 다음 주 월요일에 폐기)</span>
+      <span><b>찾는 방법</b> 사진의 보관 장소 교무실로 가서 선생님께 말씀드리기</span>
+    </div>
+    <div class="places" id="places" role="group" aria-label="보관 장소"></div>
+    <div class="tools">
+      <input id="q" type="search" placeholder="물건 이름이나 특징 검색 (예: 검정 후드티)">
+      <select id="cat" aria-label="물품 종류"></select>
+    </div>
+    <div class="grid" id="grid"><p class="status">불러오는 중…</p></div>
+  </section>
+
+  <!-- 담당자 로그인 -->
+  <section id="v-login" hidden>
+    <form class="panel login" id="login-form">
+      <h2>담당자 로그인</h2>
+      <label class="f">이메일<input id="l-email" type="email" required autocomplete="username"></label>
+      <label class="f">비밀번호<input id="l-pw" type="password" required autocomplete="current-password"></label>
+      <button class="btn primary" type="submit" id="l-btn">로그인</button>
+      <p class="err" id="l-err" hidden></p>
+      <p class="note">담당자 계정은 담당 선생님께 받으세요.</p>
+    </form>
+  </section>
+
+  <!-- 담당자용 -->
+  <section id="v-adm" hidden style="flex-direction:column;gap:16px">
+    <div class="topbar"><span id="who"></span><button class="btn" id="logout" type="button">로그아웃</button></div>
+    <div class="admin">
+      <form class="panel" id="form" autocomplete="off">
+        <h2>분실물 올리기</h2>
+        <div class="duty" id="duty"></div>
+        <p class="nophoto" id="nophoto" hidden>학생증·카드는 개인정보 보호를 위해 사진을 올리지 않아요. 물건 이름에 "학생증 1개"처럼 적어 주세요.</p>
+        <label class="photo" id="drop"><input id="file" type="file" accept="image/*" capture="environment"><span id="drop-txt"></span></label>
+        <label class="f">보관 장소<select id="f-place" required></select></label>
+        <label class="f">물품 종류<select id="f-cat" required></select></label>
+        <label class="f">물건 이름<input id="f-name" required maxlength="30" placeholder="예: 남색 체육복 상의"></label>
+        <label class="f">특징 (선택)<textarea id="f-desc" rows="2" maxlength="80" placeholder="예: 왼팔에 흰 줄, 사이즈 95"></textarea></label>
+        <button class="btn primary" type="submit" id="f-btn">올리기</button>
+        <p class="note">올린 물건은 7일 뒤 저녁 7시에 자동으로 삭제됩니다.</p>
+      </form>
+      <div class="panel">
+        <h2>보관 중인 물건 <span id="cnt" style="font-family:var(--f-mono);font-size:16px;color:var(--muted)"></span></h2>
+        <div class="list" id="list"></div>
+      </div>
+      <div class="panel roster">
+        <h2>요일별 담당 명단</h2>
+        <div class="roster-grid" id="roster-grid"></div>
+        <div class="roster-in">
+          <label class="f">명단 붙여넣기 (엑셀에서 복사해도 됩니다)<textarea id="roster-text" rows="6"></textarea></label>
+          <div class="fmt">
+            <span>한 줄에 요일 하나, 이름은 쉼표로 구분해 주세요.</span>
+            <pre>월, 김하늘, 이준서
+화, 박지호, 최유나
+수, 정다은</pre>
+            <span>엑셀(.xlsx)이나 CSV 파일은 A열에 요일, B열부터 이름을 넣으면 됩니다.</span>
+            <div class="btns">
+              <button class="btn primary" type="button" id="roster-apply">명단 저장</button>
+              <span class="btn filebtn">파일 올리기<input id="roster-file" type="file" accept=".xlsx,.xls,.csv,.txt" aria-label="명단 파일 올리기"></span>
+            </div>
+            <p class="err" id="roster-err" hidden></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>학생자치회 · 분실물함 위치: 1학년 1교무실, 1학년 2교무실, 2학년 1교무실, 2학년 2교무실, 3학년 교무실 · <a href="#admin" id="nav">담당자 페이지</a></footer>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
