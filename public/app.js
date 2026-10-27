@@ -86,16 +86,54 @@ const normPlace = (s) => {
   return PLACES.find((p) => p.replace(/\s/g, "") === k) || null;
 };
 
+// dated[place][YYYY-MM-DD] = [이름…] (구글 시트에서 동기화된 날짜별 명단)
+let dated = {}, syncStatus = null;
+const SCHEDULE_DAYS = 10; // 오늘부터 수업일 10일(약 2주) 표시
+
 async function loadAdmin() {
-  const [{ data: its, error: e1 }, { data: ros }] = await Promise.all([
-    sb.from("items").select("*").gte("received_on", addDays(todayKST(), -7)).order("received_on").order("id"),
+  const t = todayKST();
+  const [{ data: its, error: e1 }, { data: ros }, { data: dts }, { data: st }] = await Promise.all([
+    sb.from("items").select("*").gte("received_on", addDays(t, -7)).order("received_on").order("id"),
     sb.from("roster").select("*"),
+    sb.from("roster_dates").select("*").gte("duty_date", t).lte("duty_date", addDays(t, 31)),
+    sb.from("sync_status").select("*").maybeSingle(),
   ]);
   if (e1) { toast("목록을 불러오지 못했어요."); return; }
   adminItems = its;
   roster = {}; (ros || []).forEach((r) => ((roster[r.place] ||= {})[r.weekday] = r.names || []));
-  renderList(); renderDuty();
+  dated = {}; (dts || []).forEach((r) => ((dated[r.place] ||= {})[r.duty_date] = r.names || []));
+  syncStatus = st;
+  renderList(); renderDuty(); renderSync();
   $("#roster-text").value = rosterToText();
+}
+// 그날 담당: 날짜별 명단이 있으면 그것, 없으면 요일 기본 명단
+function dutyFor(place, date) {
+  const d = dated[place]?.[date];
+  if (d?.length) return { names: d, src: "sheet" };
+  const w = weekday(date);
+  return { names: w >= 1 && w <= 5 ? namesFor(place, w) : [], src: "weekly" };
+}
+function schoolDays(from, n) {
+  const out = []; let d = from;
+  while (out.length < n) { const w = weekday(d); if (w >= 1 && w <= 5) out.push(d); d = addDays(d, 1); }
+  return out;
+}
+function renderSchedule() {
+  const t = todayKST();
+  $("#schedule").innerHTML = schoolDays(t, SCHEDULE_DAYS).map((d) => {
+    const { names, src } = dutyFor(rPlace, d);
+    return `<div class="sday${d === t ? " today" : ""}">
+      <div class="dt"><b>${fmt(d)}${d === t ? " 오늘" : ""}</b><span class="src${src === "sheet" ? " sheet" : ""}">${src === "sheet" ? "구글 시트" : "요일 명단"}</span></div>
+      <span class="nm${names.length ? "" : " empty-n"}">${names.length ? names.map(personHTML).join(", ") : "담당자 없음"}</span>
+    </div>`;
+  }).join("");
+}
+function renderSync() {
+  const el = $("#sync-msg"), s = syncStatus;
+  if (!s?.last_run_at) { el.textContent = "아직 구글 시트를 불러온 적이 없어요. 매일 아침 6시 30분에 자동으로 불러옵니다."; el.className = "sync-msg"; return; }
+  const when = new Date(s.last_run_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" });
+  el.textContent = `마지막 불러오기 ${when} · ${s.message}`;
+  el.className = "sync-msg" + (s.ok ? "" : " bad");
 }
 function renderList() {
   $("#cnt").textContent = adminItems.filter((i) => !i.claimed).length + "개";
@@ -108,14 +146,12 @@ function renderList() {
 }
 const namesFor = (place, wd) => roster[place]?.[wd] || [];
 function renderDuty() {
-  const t = todayKST(), wd = weekday(t), place = $("#f-place").value, names = namesFor(place, wd);
+  const t = todayKST(), wd = weekday(t), place = $("#f-place").value, { names } = dutyFor(place, t);
   $("#duty").innerHTML = `<span>${fmt(t)} ${esc(place)} 담당</span>` +
     (wd < 1 || wd > 5 ? '<span class="none">주말에는 담당자가 없어요</span>'
-      : names.length ? `<span class="who">${names.map(personHTML).join(", ")}</span>` : '<span class="none">이 교무실의 오늘 명단이 비어 있어요. 아래에서 명단을 올려 주세요.</span>');
-  $("#r-places").innerHTML = PLACES.map((p) => {
-    const n = [1, 2, 3, 4, 5].filter((w) => namesFor(p, w).length).length;
-    return `<button type="button" aria-pressed="${p === rPlace}" data-p="${p}">${p}<span class="n">${n}/5</span></button>`;
-  }).join("");
+      : names.length ? `<span class="who">${names.map(personHTML).join(", ")}</span>` : '<span class="none">이 교무실의 오늘 담당자가 비어 있어요. 구글 시트나 요일 명단을 확인해 주세요.</span>');
+  renderSchedule();
+  $("#r-places").innerHTML = PLACES.map((p) => `<button type="button" aria-pressed="${p === rPlace}" data-p="${p}">${p}</button>`).join("");
   $("#roster-grid").innerHTML = [1, 2, 3, 4, 5].map((i) => {
     const nm = namesFor(rPlace, i);
     return `<div class="day${i === wd ? " today" : ""}"><span class="dn">${WD[i]}${i === wd ? " · 오늘" : ""}</span><span class="nm${nm.length ? "" : " empty-n"}">${nm.length ? nm.map(personHTML).join(", ") : "미등록"}</span></div>`;
@@ -287,6 +323,15 @@ $("#f-place").addEventListener("change", renderDuty);
 $("#r-places").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   rPlace = b.dataset.p; showErr($("#roster-err"), ""); $("#roster-text").value = rosterToText(); renderDuty();
+});
+$("#sync-btn").addEventListener("click", async (e) => {
+  const btn = e.currentTarget; btn.disabled = true; btn.textContent = "불러오는 중…";
+  try {
+    const { data, error } = await sb.functions.invoke("sync-roster", { body: {} });
+    let msg = data?.message;
+    if (error && !msg) { try { msg = (await error.context.json()).message; } catch { msg = "불러오지 못했어요. 잠시 후 다시 시도해 주세요."; } }
+    toast(msg || "불러왔어요.");
+  } finally { btn.disabled = false; btn.textContent = "구글 시트에서 지금 불러오기"; loadAdmin(); }
 });
 $("#roster-apply").addEventListener("click", () => saveRoster($("#roster-text").value));
 $("#roster-file").addEventListener("change", (e) => {

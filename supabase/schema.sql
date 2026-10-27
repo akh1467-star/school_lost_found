@@ -59,3 +59,18 @@ create policy "staff delete photos" on storage.objects for delete to authenticat
 --   url := 'https://<project>.supabase.co/functions/v1/cleanup-expired',
 --   headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer <anon key>'),
 --   body := '{}'::jsonb) $$);
+
+-- 날짜별 담당 명단 (구글 시트 동기화, Edge Function sync-roster가 기록)
+create table public.roster_dates (
+  duty_date date not null,
+  place text not null check (place in ('1학년 1교무실','1학년 2교무실','2학년 1교무실','2학년 2교무실','3학년 교무실')),
+  names text[] not null default '{}',
+  primary key (duty_date, place)
+);
+alter table public.roster_dates enable row level security;
+create policy "staff read roster_dates" on public.roster_dates for select to authenticated using (public.is_staff());
+create table public.sync_status (id smallint primary key default 1 check (id = 1), last_run_at timestamptz, ok boolean, message text, rows_loaded int);
+insert into public.sync_status (id) values (1);
+alter table public.sync_status enable row level security;
+create policy "staff read sync_status" on public.sync_status for select to authenticated using (public.is_staff());
+-- 매일 06:30(한국 시간) sync-roster 호출: cron '30 21 * * *'

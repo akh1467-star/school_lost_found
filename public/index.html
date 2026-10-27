@@ -70,8 +70,15 @@
         <div class="list" id="list"></div>
       </div>
       <div class="panel roster">
-        <h2>교무실별 요일 담당 명단</h2>
+        <h2>담당 일정</h2>
         <div class="places" id="r-places" role="group" aria-label="명단을 볼 교무실"></div>
+        <div class="schedule" id="schedule"></div>
+        <div class="sync">
+          <div class="sync-msg" id="sync-msg"></div>
+          <button class="btn" type="button" id="sync-btn">구글 시트에서 지금 불러오기</button>
+        </div>
+        <details class="weekly">
+          <summary>요일 기본 명단 (구글 시트에 날짜가 없을 때 쓰는 명단)</summary>
         <div class="roster-grid" id="roster-grid"></div>
         <div class="roster-in">
           <label class="f"><span id="r-label">명단 붙여넣기</span><textarea id="roster-text" rows="6"></textarea></label>
@@ -89,6 +96,7 @@
             <p class="err" id="roster-err" hidden></p>
           </div>
         </div>
+        </details>
       </div>
     </div>
   </section>

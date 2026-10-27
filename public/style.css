@@ -118,3 +118,20 @@ footer a{color:var(--ink)}
 @media (max-width:420px){.mark{width:44px;height:44px}}
 .sid{font-family:var(--f-mono);font-size:.86em;opacity:.75;font-variant-numeric:tabular-nums}
 .warn-note{color:var(--warn);font-size:13px;margin:0}
+/* 날짜별 담당 일정 */
+.schedule{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.sday{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.sday.today{border-color:var(--ink);background:var(--ink-soft)}
+.sday .dt{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.sday .dt b{font-family:var(--f-display);font-weight:400;font-size:18px;color:var(--ink)}
+.src{font-size:11px;padding:1px 7px;border-radius:999px;background:var(--bg);color:var(--muted);white-space:nowrap}
+.src.sheet{background:var(--tag);color:var(--tag-ink)}
+.sday .nm{font-size:13.5px;word-break:keep-all}
+.sday .nm.empty-n{color:var(--warn)}
+.sync{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.sync-msg{font-size:13px;color:var(--muted);min-width:0;flex:1 1 240px}
+.sync-msg.bad{color:var(--warn)}
+details.weekly{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:12px}
+details.weekly summary{cursor:pointer;font-weight:500;color:var(--ink)}
+details.weekly[open] summary{margin-bottom:12px}
+details.weekly .roster-in{margin-top:12px}
