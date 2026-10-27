@@ -23,16 +23,19 @@
 
 데이터베이스 설정은 `supabase/schema.sql`에 정리되어 있습니다.
 
-## 담당자 계정 추가하기
+## 계정 종류
 
-1. Supabase 대시보드 → `school-lost-and-found` → **Authentication → Users → Add user**에서 이메일·비밀번호로 계정 만들기 (Auto Confirm 체크)
-2. **SQL Editor**에서 그 이메일을 담당자 목록에 추가
+| 계정 | 로그인 | 할 수 있는 일 |
+| --- | --- | --- |
+| 선생님 | 이메일 + 비밀번호 | 모든 기능, 요일 명단 수정, 구글 시트 불러오기, 학생 계정 비밀번호 관리 |
+| 학생 담당 (공용) | 아이디 `student` + 비밀번호 | 분실물 올리기, 주인 찾음 표시, 오늘 올린 물건 삭제, 담당 일정 보기 |
+
+- 학생 계정 비밀번호는 선생님이 담당자 페이지 아래 **학생 담당 계정**에서 정하고 바꿉니다 (Edge Function `student-account`). 바꾸면 예전 비밀번호로 로그인된 기기는 모두 로그아웃됩니다.
+- 선생님 계정을 추가하려면 Supabase 대시보드 → Authentication → Users → Add user(Auto Confirm 체크)로 만든 뒤 SQL Editor에서:
 
 ```sql
-insert into public.staff (email, note) values ('담당자이메일@example.com', '학생자치회 공용');
+insert into public.staff (email, note, role) values ('선생님이메일@example.com', '선생님', 'teacher');
 ```
-
-담당자에서 빼려면 `delete from public.staff where email = '...';`
 
 ## 담당 명단 양식
 

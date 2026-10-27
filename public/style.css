@@ -137,3 +137,8 @@ details.weekly[open] summary{margin-bottom:12px}
 details.weekly .roster-in{margin-top:12px}
 .linkbtn{background:none;border:0;padding:0;font:inherit;font-size:13.5px;color:var(--ink);text-decoration:underline;cursor:pointer;align-self:flex-start}
 .ok-msg{color:var(--ok);font-size:13px;margin:0}
+.stu-row{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.stu-row label.f{flex:1 1 220px;min-width:0}
+.stu-row input{font-family:var(--f-mono)}
+.role-chip{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--ink-soft);color:var(--ink);margin-left:6px}
+body.role-student .teacher-only{display:none!important}

@@ -80,3 +80,8 @@ create table public.app_config (key text primary key, value text not null, updat
 alter table public.app_config enable row level security;
 revoke all on public.app_config from anon, authenticated;
 -- insert into public.app_config (key, value) values ('roster_sheet_csv_url', '<구글 시트 CSV 게시 주소>');
+
+-- 역할: teacher / student
+alter table public.staff add column role text not null default 'teacher' check (role in ('teacher','student'));
+-- my_role(), is_teacher() 함수와 정책: 삭제는 선생님 전체·학생은 오늘 올린 물건만, 요일 명단 수정과 담당자 목록 보기는 선생님만
+-- revoke_user_sessions(uid): 학생 계정 비밀번호 변경 시 기존 로그인 해제 (service_role 전용)

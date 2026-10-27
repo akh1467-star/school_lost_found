@@ -141,7 +141,7 @@ function renderList() {
     <div class="row">
       <div class="th">${pic(it)}</div>
       <div style="min-width:0"><div class="t">${esc(it.name)}</div><div class="s">${esc(it.place)} · ${fmt(it.received_on)} 입고 → ${fmt(addDays(it.received_on, 7))} 폐기</div></div>
-      <div class="b" data-id="${it.id}">${it.claimed ? '<span class="chip done">주인 찾음</span>' : '<button class="btn" type="button" data-a="done">주인 찾음</button><button class="btn danger" type="button" data-a="del">삭제</button>'}</div>
+      <div class="b" data-id="${it.id}">${it.claimed ? '<span class="chip done">주인 찾음</span>' : '<button class="btn" type="button" data-a="done">주인 찾음</button>' + (role === "teacher" || it.received_on === todayKST() ? '<button class="btn danger" type="button" data-a="del">삭제</button>' : "")}</div>
     </div>`).join("") : '<p class="note">보관 중인 물건이 없어요.</p>';
 }
 const namesFor = (place, wd) => roster[place]?.[wd] || [];
@@ -230,6 +230,12 @@ function shrink(file) {
 }
 function resetPhoto() { photoBlob = null; $("#drop-txt").innerHTML = DROP_TXT; }
 
+// ---------- 로그인 아이디 ----------
+// 학생 담당 공용 계정은 아이디 "student"로 로그인 (실제 계정 이메일은 아래 주소)
+const STUDENT_EMAIL = "sekyo.student@example.com";
+const toEmail = (id) => { const s = id.trim().toLowerCase(); return s === "student" ? STUDENT_EMAIL : s; };
+let role = null;
+
 // ---------- 화면 전환 ----------
 // 비밀번호 재설정 메일의 링크로 들어온 경우 (주소 끝에 type=recovery)
 let resetMode = /type=recovery/.test(location.hash);
@@ -257,15 +263,38 @@ async function route() {
   if (!admin) { $("#v-login").hidden = true; $("#v-adm").hidden = true; loadPublic(); return; }
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { $("#v-login").hidden = false; $("#v-adm").hidden = true; return; }
-  const { data: ok } = await sb.rpc("is_staff");
-  if (!ok) {
+  const { data: r } = await sb.rpc("my_role");
+  if (!r) {
     $("#v-login").hidden = false; $("#v-adm").hidden = true;
     showErr($("#l-err"), `${session.user.email} 계정은 담당자로 등록되어 있지 않아요. 담당 선생님께 문의해 주세요.`);
     await sb.auth.signOut(); return;
   }
+  role = r; document.body.classList.toggle("role-student", r === "student");
   $("#v-login").hidden = true; $("#v-adm").hidden = false; $("#v-adm").style.display = "flex";
-  $("#who").textContent = `${session.user.email}로 로그인됨`;
+  const isStu = session.user.email === STUDENT_EMAIL;
+  $("#who").innerHTML = `${isStu ? "student" : esc(session.user.email)}로 로그인됨<span class="role-chip">${r === "teacher" ? "선생님" : "학생 담당"}</span>`;
   loadAdmin();
+  if (r === "teacher") loadStudentAccount();
+}
+
+// ---------- 학생 담당 계정 (선생님만) ----------
+async function callStudentAccount(body) {
+  const { data, error } = await sb.functions.invoke("student-account", { body });
+  if (error) { try { return await error.context.json(); } catch { return { ok: false, message: "서버에 연결하지 못했어요." }; } }
+  return data;
+}
+async function loadStudentAccount() {
+  const res = await callStudentAccount({ action: "status" });
+  const el = $("#stu-status");
+  if (!res?.ok) { el.textContent = res?.message || ""; return; }
+  el.textContent = res.exists
+    ? `학생 계정이 있어요. 비밀번호를 마지막으로 바꾼 때: ${new Date(res.updated_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+    : "아직 학생 계정이 없어요. 비밀번호를 정하면 계정이 만들어져요.";
+}
+function genPassword() {
+  const words = ["sun", "tree", "book", "cloud", "river", "star", "apple", "wind", "rain", "leaf"];
+  const a = new Uint32Array(3); crypto.getRandomValues(a);
+  return `${words[a[0] % words.length]}-${1000 + (a[1] % 9000)}-${words[a[2] % words.length]}`;
 }
 
 // ---------- 이벤트 ----------
@@ -282,20 +311,33 @@ window.addEventListener("hashchange", route);
 $("#login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = $("#l-btn"); btn.disabled = true; showErr($("#l-err"), "");
-  const { error } = await sb.auth.signInWithPassword({ email: $("#l-email").value.trim(), password: $("#l-pw").value });
+  const { error } = await sb.auth.signInWithPassword({ email: toEmail($("#l-email").value), password: $("#l-pw").value });
   btn.disabled = false;
-  if (error) { showErr($("#l-err"), "이메일이나 비밀번호가 맞지 않아요."); return; }
+  if (error) { showErr($("#l-err"), "아이디(이메일)나 비밀번호가 맞지 않아요."); return; }
   $("#l-pw").value = ""; route();
 });
-$("#logout").addEventListener("click", async () => { await sb.auth.signOut(); route(); });
+$("#logout").addEventListener("click", async () => { await sb.auth.signOut(); role = null; document.body.classList.remove("role-student"); route(); });
+$("#stu-gen").addEventListener("click", () => { $("#stu-pw").value = genPassword(); $("#stu-pw").select(); });
+$("#stu-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const pw = $("#stu-pw").value.trim(), btn = $("#stu-btn");
+  if (pw.length < 8) return toast("비밀번호는 8자 이상이어야 해요.");
+  btn.disabled = true; btn.textContent = "저장 중…";
+  const res = await callStudentAccount({ action: "set_password", password: pw });
+  btn.disabled = false; btn.textContent = "비밀번호 정하기";
+  if (!res?.ok) return toast(res?.message || "저장하지 못했어요.");
+  toast(`${res.message} 학생들에게 아이디 student, 비밀번호 ${pw}를 알려 주세요.`);
+  loadStudentAccount();
+});
 $("#chpw").addEventListener("click", () => { resetMode = true; route(); });
 
 sb.auth.onAuthStateChange((event) => {
   if (event === "PASSWORD_RECOVERY") { resetMode = true; setTimeout(route, 0); }
 });
 $("#forgot").addEventListener("click", async () => {
-  const email = $("#l-email").value.trim(), err = $("#l-err");
-  if (!email) { showErr(err, "위에 담당자 이메일을 먼저 적고 다시 눌러 주세요."); $("#l-email").focus(); return; }
+  const email = toEmail($("#l-email").value), err = $("#l-err");
+  if (!email) { showErr(err, "위에 선생님 이메일을 먼저 적고 다시 눌러 주세요."); $("#l-email").focus(); return; }
+  if (email === STUDENT_EMAIL || !email.includes("@")) { showErr(err, "학생 담당 비밀번호는 담당 선생님께 다시 받아 주세요."); return; }
   const btn = $("#forgot"); btn.disabled = true;
   const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
   btn.disabled = false;
