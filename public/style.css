@@ -135,3 +135,5 @@ details.weekly{border-top:1px solid var(--line);padding-top:12px;display:flex;fl
 details.weekly summary{cursor:pointer;font-weight:500;color:var(--ink)}
 details.weekly[open] summary{margin-bottom:12px}
 details.weekly .roster-in{margin-top:12px}
+.linkbtn{background:none;border:0;padding:0;font:inherit;font-size:13.5px;color:var(--ink);text-decoration:underline;cursor:pointer;align-self:flex-start}
+.ok-msg{color:var(--ok);font-size:13px;margin:0}

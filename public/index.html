@@ -45,13 +45,22 @@
       <label class="f">비밀번호<input id="l-pw" type="password" required autocomplete="current-password"></label>
       <button class="btn primary" type="submit" id="l-btn">로그인</button>
       <p class="err" id="l-err" hidden></p>
+      <button class="linkbtn" type="button" id="forgot">비밀번호를 잊었어요</button>
       <p class="note">담당자 계정은 담당 선생님께 받으세요.</p>
+    </form>
+    <form class="panel login" id="reset-form" hidden>
+      <h2>새 비밀번호 정하기</h2>
+      <p class="note" id="reset-who"></p>
+      <label class="f">새 비밀번호 (8자 이상)<input id="r-pw" type="password" required minlength="8" autocomplete="new-password"></label>
+      <label class="f">한 번 더 입력<input id="r-pw2" type="password" required minlength="8" autocomplete="new-password"></label>
+      <button class="btn primary" type="submit" id="r-btn">비밀번호 바꾸기</button>
+      <p class="err" id="r-err" hidden></p>
     </form>
   </section>
 
   <!-- 담당자용 -->
   <section id="v-adm" hidden style="flex-direction:column;gap:16px">
-    <div class="topbar"><span id="who"></span><button class="btn" id="logout" type="button">로그아웃</button></div>
+    <div class="topbar"><span id="who"></span><span class="btns"><button class="btn" id="chpw" type="button">비밀번호 바꾸기</button><button class="btn" id="logout" type="button">로그아웃</button></span></div>
     <div class="admin">
       <form class="panel" id="form" autocomplete="off">
         <h2>분실물 올리기</h2>

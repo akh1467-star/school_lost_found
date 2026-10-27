@@ -231,7 +231,24 @@ function shrink(file) {
 function resetPhoto() { photoBlob = null; $("#drop-txt").innerHTML = DROP_TXT; }
 
 // ---------- 화면 전환 ----------
+// 비밀번호 재설정 메일의 링크로 들어온 경우 (주소 끝에 type=recovery)
+let resetMode = /type=recovery/.test(location.hash);
+function showReset(email) {
+  $("#v-stu").hidden = true; $("#v-stu").style.display = ""; $("#v-adm").hidden = true;
+  $("#v-login").hidden = false; $("#login-form").hidden = true; $("#reset-form").hidden = false;
+  $("#reset-who").textContent = email ? `${email} 계정의 새 비밀번호를 정해 주세요.` : "";
+  $("#sub").textContent = "담당자 비밀번호를 새로 정하는 화면입니다.";
+  $("#r-pw").focus();
+}
+
 async function route() {
+  if (resetMode) {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) return showReset(session.user.email);
+    if (!/access_token|type=recovery/.test(location.hash)) resetMode = false; // 링크가 만료된 경우
+    else return; // 세션 처리 중 → onAuthStateChange에서 다시 부름
+  }
+  $("#login-form").hidden = false; $("#reset-form").hidden = true;
   const admin = location.hash === "#admin";
   $("#v-stu").hidden = admin; $("#v-stu").style.display = admin ? "" : "flex";
   $("#nav").textContent = admin ? "분실물 찾아보기" : "담당자 페이지";
@@ -271,6 +288,35 @@ $("#login-form").addEventListener("submit", async (e) => {
   $("#l-pw").value = ""; route();
 });
 $("#logout").addEventListener("click", async () => { await sb.auth.signOut(); route(); });
+$("#chpw").addEventListener("click", () => { resetMode = true; route(); });
+
+sb.auth.onAuthStateChange((event) => {
+  if (event === "PASSWORD_RECOVERY") { resetMode = true; setTimeout(route, 0); }
+});
+$("#forgot").addEventListener("click", async () => {
+  const email = $("#l-email").value.trim(), err = $("#l-err");
+  if (!email) { showErr(err, "위에 담당자 이메일을 먼저 적고 다시 눌러 주세요."); $("#l-email").focus(); return; }
+  const btn = $("#forgot"); btn.disabled = true;
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  btn.disabled = false;
+  if (error) {
+    showErr(err, /rate|limit|seconds/i.test(error.message) ? "메일을 너무 자주 요청했어요. 잠시 후 다시 시도해 주세요." : "메일을 보내지 못했어요. 이메일 주소를 확인해 주세요.");
+    return;
+  }
+  err.hidden = true; toast(`${email}로 재설정 메일을 보냈어요. 메일의 링크를 눌러 주세요.`);
+});
+$("#reset-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const a = $("#r-pw").value, b = $("#r-pw2").value, err = $("#r-err");
+  if (a !== b) { showErr(err, "두 비밀번호가 서로 달라요. 다시 입력해 주세요."); return; }
+  const btn = $("#r-btn"); btn.disabled = true;
+  const { error } = await sb.auth.updateUser({ password: a });
+  btn.disabled = false;
+  if (error) { showErr(err, /different|same/i.test(error.message) ? "지금 쓰는 비밀번호와 다른 비밀번호를 정해 주세요." : "비밀번호를 바꾸지 못했어요. 8자 이상인지 확인해 주세요."); return; }
+  e.target.reset(); showErr(err, ""); resetMode = false;
+  history.replaceState(null, "", location.pathname + "#admin");
+  toast("비밀번호를 바꿨어요."); route();
+});
 
 $("#f-cat").addEventListener("change", (e) => {
   const no = NO_PHOTO.includes(e.target.value);
