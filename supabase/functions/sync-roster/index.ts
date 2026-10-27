@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 // 구글 시트("웹에 게시" CSV)의 날짜별 담당 명단을 읽어 roster_dates를 통째로 갱신합니다.
-// 시트 주소는 비밀값 ROSTER_SHEET_CSV_URL에만 저장합니다 (사이트 코드에 넣지 않음).
+// 시트 주소는 서버 전용 테이블 app_config(key='roster_sheet_csv_url')에 저장합니다 (사이트 코드에 넣지 않음).
 // 시트 형식: 날짜 | 요일(선택) | 교무실 | 학번1 | 이름1 | 학번2 | 이름2 …
 
 const PLACES = ["1학년 1교무실", "1학년 2교무실", "2학년 1교무실", "2학년 2교무실", "3학년 교무실"];
@@ -85,7 +85,8 @@ Deno.serve(async (req) => {
     return json({ ok, message, rows_loaded }, ok ? 200 : 400);
   };
 
-  const url = Deno.env.get("ROSTER_SHEET_CSV_URL");
+  const { data: cfg } = await admin.from("app_config").select("value").eq("key", "roster_sheet_csv_url").maybeSingle();
+  const url = cfg?.value ?? Deno.env.get("ROSTER_SHEET_CSV_URL");
   if (!url) return record(false, "구글 시트 주소가 아직 등록되지 않았어요.");
   if (!/^https:\/\/docs\.google\.com\/spreadsheets\//.test(url)) return record(false, "구글 시트 게시 주소가 아니에요.");
 

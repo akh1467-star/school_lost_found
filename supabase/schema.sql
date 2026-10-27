@@ -74,3 +74,9 @@ insert into public.sync_status (id) values (1);
 alter table public.sync_status enable row level security;
 create policy "staff read sync_status" on public.sync_status for select to authenticated using (public.is_staff());
 -- 매일 06:30(한국 시간) sync-roster 호출: cron '30 21 * * *'
+
+-- 서버 전용 설정 (정책 없음 → 서버 함수만 읽음). 구글 시트 게시 주소를 여기에 저장
+create table public.app_config (key text primary key, value text not null, updated_at timestamptz not null default now());
+alter table public.app_config enable row level security;
+revoke all on public.app_config from anon, authenticated;
+-- insert into public.app_config (key, value) values ('roster_sheet_csv_url', '<구글 시트 CSV 게시 주소>');

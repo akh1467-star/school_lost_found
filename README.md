@@ -41,6 +41,12 @@ insert into public.staff (email, note) values ('담당자이메일@example.com',
 ## 구글 시트 날짜별 담당 연동
 
 - `templates/세교중_분실물_날짜별담당_구글시트양식.xlsx`를 구글 시트로 바꿔 날짜별 담당 학생을 적습니다.
-- 시트를 "웹에 게시(CSV)"한 주소는 Supabase Edge Function 비밀값 `ROSTER_SHEET_CSV_URL`에 저장합니다 (사이트 코드에는 넣지 않음).
+- 시트를 "웹에 게시(CSV)"한 주소는 Supabase의 서버 전용 테이블 `app_config`(key `roster_sheet_csv_url`)에 저장합니다 (사이트 코드에는 넣지 않음).
 - 함수 `sync-roster`가 매일 06:30(한국 시간)에 시트를 읽어 `roster_dates`를 갱신하고, 담당자 페이지의 "구글 시트에서 지금 불러오기"로도 실행됩니다.
 - 그날 담당자는 날짜별 명단이 있으면 그것을, 없으면 요일 기본 명단을 씁니다.
+
+시트 주소를 바꾸려면 Supabase SQL Editor에서:
+
+```sql
+update public.app_config set value = '<새 CSV 게시 주소>', updated_at = now() where key = 'roster_sheet_csv_url';
+```
