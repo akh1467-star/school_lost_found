@@ -33,3 +33,7 @@ insert into public.staff (email, note) values ('담당자이메일@example.com',
 ```
 
 담당자에서 빼려면 `delete from public.staff where email = '...';`
+
+## 담당 명단 양식
+
+`templates/` 폴더의 엑셀(.xlsx) 또는 CSV 양식에 학번·이름을 적어 담당자 페이지 → 파일 올리기로 올립니다. 양식에는 다섯 교무실이 모두 들어 있어서, 올리면 전체 명단이 한 번에 바뀝니다.
