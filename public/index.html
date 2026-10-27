@@ -76,12 +76,12 @@
         <div class="roster-in">
           <label class="f"><span id="r-label">명단 붙여넣기</span><textarea id="roster-text" rows="6"></textarea></label>
           <div class="fmt">
-            <span>위에서 고른 교무실 명단을 고칠 때는 한 줄에 요일 하나, 이름은 쉼표로 구분해 주세요.</span>
-            <pre>월, 김하늘, 이준서
-화, 박지호, 최유나</pre>
-            <span>다섯 교무실을 한 번에 올리려면 맨 앞에 교무실을 붙여 주세요. 엑셀은 A열 교무실, B열 요일, C열부터 이름입니다.</span>
-            <pre>1학년 1교무실, 월, 김하늘, 이준서
-2학년 2교무실, 화, 박지호</pre>
+            <span>위에서 고른 교무실 명단을 고칠 때는 한 줄에 요일 하나, 사람은 쉼표로 구분하고 이름 앞에 학번을 적어 주세요.</span>
+            <pre>월, 10512 김하늘, 10304 이준서
+화, 10221 박지호</pre>
+            <span>다섯 교무실을 한 번에 올리려면 맨 앞에 교무실을 붙여 주세요. 엑셀은 A열 교무실, B열 요일, 그 뒤로 학번·이름 칸을 번갈아 넣어도 됩니다.</span>
+            <pre>1학년 1교무실, 월, 10512 김하늘, 10304 이준서
+2학년 2교무실, 화, 20221, 박지호</pre>
             <div class="btns">
               <button class="btn primary" type="button" id="roster-apply">명단 저장</button>
               <span class="btn filebtn">파일 올리기<input id="roster-file" type="file" accept=".xlsx,.xls,.csv,.txt" aria-label="명단 파일 올리기"></span>

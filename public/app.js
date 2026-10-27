@@ -111,14 +111,14 @@ function renderDuty() {
   const t = todayKST(), wd = weekday(t), place = $("#f-place").value, names = namesFor(place, wd);
   $("#duty").innerHTML = `<span>${fmt(t)} ${esc(place)} 담당</span>` +
     (wd < 1 || wd > 5 ? '<span class="none">주말에는 담당자가 없어요</span>'
-      : names.length ? `<span class="who">${names.map(esc).join(", ")}</span>` : '<span class="none">이 교무실의 오늘 명단이 비어 있어요. 아래에서 명단을 올려 주세요.</span>');
+      : names.length ? `<span class="who">${names.map(personHTML).join(", ")}</span>` : '<span class="none">이 교무실의 오늘 명단이 비어 있어요. 아래에서 명단을 올려 주세요.</span>');
   $("#r-places").innerHTML = PLACES.map((p) => {
     const n = [1, 2, 3, 4, 5].filter((w) => namesFor(p, w).length).length;
     return `<button type="button" aria-pressed="${p === rPlace}" data-p="${p}">${p}<span class="n">${n}/5</span></button>`;
   }).join("");
   $("#roster-grid").innerHTML = [1, 2, 3, 4, 5].map((i) => {
     const nm = namesFor(rPlace, i);
-    return `<div class="day${i === wd ? " today" : ""}"><span class="dn">${WD[i]}${i === wd ? " · 오늘" : ""}</span><span class="nm${nm.length ? "" : " empty-n"}">${nm.length ? nm.map(esc).join(", ") : "미등록"}</span></div>`;
+    return `<div class="day${i === wd ? " today" : ""}"><span class="dn">${WD[i]}${i === wd ? " · 오늘" : ""}</span><span class="nm${nm.length ? "" : " empty-n"}">${nm.length ? nm.map(personHTML).join(", ") : "미등록"}</span></div>`;
   }).join("");
   $("#r-label").textContent = `${rPlace} 명단 (엑셀에서 복사해 붙여넣어도 됩니다)`;
 }
@@ -136,10 +136,29 @@ function parseRoster(text) {
     if (!rest.length && /\s/.test(first)) { const p = first.split(/\s+/); first = p[0]; rest = p.slice(1); }
     const i = WD.indexOf(first.replace(/요일$/, "").charAt(0));
     if (i < 1 || i > 5) { if (!/^(요일|교무실|장소)/.test(first)) bad.push(line.trim()); return; }
-    ((out[place] ||= {})[i] ||= []).push(...rest);
+    ((out[place] ||= {})[i] ||= []).push(...normEntries(rest));
   });
   return { out, bad };
 }
+// "20512 김하늘", "김하늘(20512)", "김하늘 20512", 학번·이름이 다른 칸인 경우 모두 "20512 김하늘"로 맞춤
+function normEntries(tokens) {
+  const parts = tokens.flatMap((t) => t.replace(/[()]/g, " ").split(/\s+/)).filter(Boolean);
+  const isNo = (t) => /^\d{3,6}$/.test(t);
+  const firstNo = parts.findIndex(isNo), firstName = parts.findIndex((t) => !isNo(t));
+  const noFirst = firstNo !== -1 && firstNo < firstName; // 이 줄이 "학번 이름" 순서인지
+  const out = [];
+  for (let k = 0; k < parts.length; k++) {
+    const t = parts[k], next = parts[k + 1];
+    if (noFirst && isNo(t) && next && !isNo(next)) { out.push(`${t} ${next}`); k++; }
+    else if (!noFirst && !isNo(t) && next && isNo(next)) { out.push(`${next} ${t}`); k++; }
+    else out.push(t);
+  }
+  return out;
+}
+const personHTML = (s) => {
+  const m = String(s).match(/^(\d{3,6})\s+(.+)$/);
+  return m ? `<span class="sid">${esc(m[1])}</span> ${esc(m[2])}` : esc(s);
+};
 async function saveRoster(text) {
   const { out, bad } = parseRoster(text), err = $("#roster-err"), places = Object.keys(out);
   if (!places.length) { showErr(err, '요일을 찾지 못했어요. 각 줄을 "월, 이름" 또는 "1학년 1교무실, 월, 이름"처럼 적어 주세요.'); return; }
@@ -149,7 +168,11 @@ async function saveRoster(text) {
   if (error) { showErr(err, "명단을 저장하지 못했어요. 다시 로그인한 뒤 시도해 주세요."); return; }
   places.forEach((p) => (roster[p] = out[p]));
   if (!places.includes(rPlace)) rPlace = places[0];
-  showErr(err, bad.length ? `알아볼 수 없는 줄 ${bad.length}개는 건너뛰었어요: ${bad.slice(0, 2).join(" / ")}` : "");
+  const noId = places.flatMap((p) => Object.values(out[p]).flat()).filter((s) => !/^\d{3,6}\s/.test(s));
+  const msgs = [];
+  if (bad.length) msgs.push(`알아볼 수 없는 줄 ${bad.length}개는 건너뛰었어요: ${bad.slice(0, 2).join(" / ")}`);
+  if (noId.length) msgs.push(`학번이 없는 이름 ${noId.length}명: ${noId.slice(0, 3).join(", ")}${noId.length > 3 ? " 등" : ""}. 동명이인이 없는지 확인해 주세요.`);
+  showErr(err, msgs.join(" "));
   $("#roster-text").value = rosterToText(); renderDuty();
   toast(places.length > 1 ? `교무실 ${places.length}곳 명단을 저장했어요.` : `${places[0]} 명단을 저장했어요.`);
 }
