@@ -41,12 +41,12 @@
   <section id="v-login" hidden>
     <form class="panel login" id="login-form">
       <h2>담당자 로그인</h2>
-      <label class="f">아이디 또는 이메일<input id="l-email" type="text" required autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="학생 담당은 student"></label>
+      <label class="f">아이디 또는 이메일<input id="l-email" type="text" required autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="학생은 학번 (예: 20512)"></label>
       <label class="f">비밀번호<input id="l-pw" type="password" required autocomplete="current-password"></label>
       <button class="btn primary" type="submit" id="l-btn">로그인</button>
       <p class="err" id="l-err" hidden></p>
       <button class="linkbtn" type="button" id="forgot">비밀번호를 잊었어요</button>
-      <p class="note">학생 담당 비밀번호는 담당 선생님께 받으세요. "비밀번호를 잊었어요"는 선생님 계정만 쓸 수 있어요.</p>
+      <p class="note">담당 학생은 학번으로 로그인해요. 처음 비밀번호는 담당 선생님께 받고, 잊어버리면 선생님께 초기화를 부탁해 주세요.</p>
     </form>
     <form class="panel login" id="reset-form" hidden>
       <h2>새 비밀번호 정하기</h2>
@@ -60,7 +60,7 @@
 
   <!-- 담당자용 -->
   <section id="v-adm" hidden style="flex-direction:column;gap:16px">
-    <div class="topbar"><span id="who"></span><span class="btns"><button class="btn teacher-only" id="chpw" type="button">비밀번호 바꾸기</button><button class="btn" id="logout" type="button">로그아웃</button></span></div>
+    <div class="topbar"><span id="who"></span><span class="btns"><button class="btn" id="chpw" type="button">비밀번호 바꾸기</button><button class="btn" id="logout" type="button">로그아웃</button></span></div>
     <div class="admin">
       <form class="panel" id="form" autocomplete="off">
         <h2>분실물 올리기</h2>
@@ -107,17 +107,21 @@
         </div>
         </details>
       </div>
-      <form class="panel roster teacher-only" id="stu-form" autocomplete="off">
-        <h2>학생 담당 계정</h2>
-        <p class="note">담당 학생들은 아이디 <b>student</b>와 아래에서 정한 비밀번호로 로그인해요. 분실물 올리기, 주인 찾음 표시, 오늘 올린 물건 삭제, 담당 일정 보기만 할 수 있어요.</p>
-        <p class="note" id="stu-status"></p>
-        <div class="stu-row">
-          <label class="f">새 비밀번호 (8자 이상)<input id="stu-pw" type="text" minlength="8" required autocomplete="off" spellcheck="false"></label>
-          <button class="btn" type="button" id="stu-gen">자동으로 만들기</button>
-          <button class="btn primary" type="submit" id="stu-btn">비밀번호 정하기</button>
+      <div class="panel roster teacher-only" id="stu-panel">
+        <h2>담당 학생 계정</h2>
+        <p class="note">담당 학생은 <b>학번</b>과 비밀번호로 로그인해요. 분실물 올리기, 주인 찾음 표시, 오늘 올린 물건 삭제, 담당 일정 보기만 할 수 있고, 누가 올렸는지 기록돼요.</p>
+        <div class="btns">
+          <button class="btn primary" type="button" id="stu-sync">명단에서 계정 만들기</button>
+          <span class="note" style="align-self:center">구글 시트와 요일 명단에 있는 학번 중 계정이 없는 학생만 새로 만들어요.</span>
         </div>
-        <p class="note">비밀번호를 바꾸면 예전 비밀번호로 로그인돼 있던 기기는 모두 로그아웃돼요. 담당 학생이 바뀔 때 바꿔 주세요.</p>
-      </form>
+        <div class="issued" id="issued" hidden>
+          <div class="issued-head"><b>새로 발급한 처음 비밀번호</b><button class="btn" type="button" id="issued-copy">목록 복사</button></div>
+          <p class="note">이 화면을 벗어나면 다시 볼 수 없어요. 복사해서 학생들에게 나눠 주세요. 학생은 처음 로그인할 때 자기 비밀번호로 바꿔야 해요.</p>
+          <div class="tbl"><table id="issued-table"></table></div>
+          <p class="err" id="issued-note" hidden></p>
+        </div>
+        <div class="tbl"><table id="stu-table"></table></div>
+      </div>
     </div>
   </section>
 

@@ -52,7 +52,7 @@ function showErr(el, msg) { el.textContent = msg; el.hidden = !msg; }
 let items = [], place = "전체", cat = "all";
 
 async function loadPublic() {
-  const { data, error } = await sb.from("items").select("*").eq("claimed", false).gte("received_on", addDays(todayKST(), -7)).order("received_on", { ascending: false }).order("id", { ascending: false });
+  const { data, error } = await sb.from("items").select("id,name,description,category,place,received_on,photo_path,claimed").eq("claimed", false).gte("received_on", addDays(todayKST(), -7)).order("received_on", { ascending: false }).order("id", { ascending: false });
   if (error) { $("#grid").innerHTML = '<p class="empty">목록을 불러오지 못했어요. 잠시 후 새로고침해 주세요.</p>'; return; }
   items = data; renderPlaces(); renderGrid();
 }
@@ -140,7 +140,7 @@ function renderList() {
   $("#list").innerHTML = adminItems.length ? adminItems.map((it) => `
     <div class="row">
       <div class="th">${pic(it)}</div>
-      <div style="min-width:0"><div class="t">${esc(it.name)}</div><div class="s">${esc(it.place)} · ${fmt(it.received_on)} 입고 → ${fmt(addDays(it.received_on, 7))} 폐기</div></div>
+      <div style="min-width:0"><div class="t">${esc(it.name)}</div><div class="s">${esc(it.place)} · ${fmt(it.received_on)} 입고 → ${fmt(addDays(it.received_on, 7))} 폐기</div>${it.uploader ? `<div class="whoby">올린 사람 ${esc(it.uploader)}</div>` : ""}</div>
       <div class="b" data-id="${it.id}">${it.claimed ? '<span class="chip done">주인 찾음</span>' : '<button class="btn" type="button" data-a="done">주인 찾음</button>' + (role === "teacher" || it.received_on === todayKST() ? '<button class="btn danger" type="button" data-a="del">삭제</button>' : "")}</div>
     </div>`).join("") : '<p class="note">보관 중인 물건이 없어요.</p>';
 }
@@ -231,18 +231,20 @@ function shrink(file) {
 function resetPhoto() { photoBlob = null; $("#drop-txt").innerHTML = DROP_TXT; }
 
 // ---------- 로그인 아이디 ----------
-// 학생 담당 공용 계정은 아이디 "student"로 로그인 (실제 계정 이메일은 아래 주소)
-const STUDENT_EMAIL = "sekyo.student@example.com";
-const toEmail = (id) => { const s = id.trim().toLowerCase(); return s === "student" ? STUDENT_EMAIL : s; };
-let role = null;
+// 담당 학생은 학번으로 로그인 (실제 계정 이메일은 sekyo.<학번>@example.com, 메일은 보내지 않음)
+const studentEmail = (no) => `sekyo.${no}@example.com`;
+const toEmail = (id) => { const s = id.trim().toLowerCase(); return /^\d{3,6}$/.test(s) ? studentEmail(s) : s; };
+let role = null, me = null; // me: { role, student_no, student_name, must_change_pw }
 
 // ---------- 화면 전환 ----------
 // 비밀번호 재설정 메일의 링크로 들어온 경우 (주소 끝에 type=recovery)
 let resetMode = /type=recovery/.test(location.hash);
-function showReset(email) {
+function showReset(label, forced = false) {
   $("#v-stu").hidden = true; $("#v-stu").style.display = ""; $("#v-adm").hidden = true;
   $("#v-login").hidden = false; $("#login-form").hidden = true; $("#reset-form").hidden = false;
-  $("#reset-who").textContent = email ? `${email} 계정의 새 비밀번호를 정해 주세요.` : "";
+  $("#reset-who").textContent = forced
+    ? `${label} 학생, 처음 로그인했어요. 선생님께 받은 비밀번호 대신 나만 아는 새 비밀번호를 정해 주세요.`
+    : label ? `${label} 계정의 새 비밀번호를 정해 주세요.` : "";
   $("#sub").textContent = "담당자 비밀번호를 새로 정하는 화면입니다.";
   $("#r-pw").focus();
 }
@@ -250,7 +252,11 @@ function showReset(email) {
 async function route() {
   if (resetMode) {
     const { data: { session } } = await sb.auth.getSession();
-    if (session) return showReset(session.user.email);
+    if (session) {
+      const { data: prof } = await sb.rpc("my_profile");
+      const p = prof?.[0];
+      return showReset(p?.role === "student" ? `${p.student_no} ${p.student_name}` : session.user.email, !!p?.must_change_pw);
+    }
     if (!/access_token|type=recovery/.test(location.hash)) resetMode = false; // 링크가 만료된 경우
     else return; // 세션 처리 중 → onAuthStateChange에서 다시 부름
   }
@@ -263,38 +269,60 @@ async function route() {
   if (!admin) { $("#v-login").hidden = true; $("#v-adm").hidden = true; loadPublic(); return; }
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { $("#v-login").hidden = false; $("#v-adm").hidden = true; return; }
-  const { data: r } = await sb.rpc("my_role");
-  if (!r) {
+  const { data: prof } = await sb.rpc("my_profile");
+  me = prof?.[0] || null;
+  if (!me) {
     $("#v-login").hidden = false; $("#v-adm").hidden = true;
-    showErr($("#l-err"), `${session.user.email} 계정은 담당자로 등록되어 있지 않아요. 담당 선생님께 문의해 주세요.`);
+    showErr($("#l-err"), "담당자로 등록되어 있지 않거나 사용이 중지된 계정이에요. 담당 선생님께 문의해 주세요.");
     await sb.auth.signOut(); return;
   }
-  role = r; document.body.classList.toggle("role-student", r === "student");
+  role = me.role; document.body.classList.toggle("role-student", role === "student");
+  const label = role === "student" ? `${me.student_no} ${me.student_name}` : session.user.email;
+  if (me.must_change_pw) { resetMode = true; return showReset(label, true); }
   $("#v-login").hidden = true; $("#v-adm").hidden = false; $("#v-adm").style.display = "flex";
-  const isStu = session.user.email === STUDENT_EMAIL;
-  $("#who").innerHTML = `${isStu ? "student" : esc(session.user.email)}로 로그인됨<span class="role-chip">${r === "teacher" ? "선생님" : "학생 담당"}</span>`;
-  loadAdmin();
-  if (r === "teacher") loadStudentAccount();
+  $("#who").innerHTML = `${esc(label)}로 로그인됨<span class="role-chip">${role === "teacher" ? "선생님" : "담당 학생"}</span>`;
+  await loadAdmin();
+  if (role === "student") pickMyPlace();
+  if (role === "teacher") loadStudents();
 }
 
-// ---------- 학생 담당 계정 (선생님만) ----------
+// 담당 학생이 로그인하면 오늘(없으면 가까운 날) 자기 담당 교무실을 자동으로 고름
+function pickMyPlace() {
+  const mine = (names) => (names || []).some((n) => n.startsWith(me.student_no + " "));
+  const t = todayKST();
+  for (const d of [t, ...schoolDays(addDays(t, 1), 5)]) {
+    const p = PLACES.find((pl) => mine(dutyFor(pl, d).names));
+    if (p) { $("#f-place").value = p; rPlace = p; renderDuty(); if (d === t) toast(`오늘 ${p} 담당이에요.`); return; }
+  }
+}
+
+// ---------- 담당 학생 계정 (선생님만) ----------
 async function callStudentAccount(body) {
   const { data, error } = await sb.functions.invoke("student-account", { body });
   if (error) { try { return await error.context.json(); } catch { return { ok: false, message: "서버에 연결하지 못했어요." }; } }
   return data;
 }
-async function loadStudentAccount() {
-  const res = await callStudentAccount({ action: "status" });
-  const el = $("#stu-status");
-  if (!res?.ok) { el.textContent = res?.message || ""; return; }
-  el.textContent = res.exists
-    ? `학생 계정이 있어요. 비밀번호를 마지막으로 바꾼 때: ${new Date(res.updated_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })}`
-    : "아직 학생 계정이 없어요. 비밀번호를 정하면 계정이 만들어져요.";
+const kst = (iso) => iso ? new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
+let issued = [];
+async function loadStudents() {
+  const res = await callStudentAccount({ action: "list" });
+  const tb = $("#stu-table");
+  if (!res?.ok) { tb.innerHTML = `<tr><td>${esc(res?.message || "목록을 불러오지 못했어요.")}</td></tr>`; return; }
+  if (!res.students.length) { tb.innerHTML = '<tr><td class="note">아직 만든 계정이 없어요. 구글 시트에 학번과 이름을 적고 불러온 뒤 "명단에서 계정 만들기"를 눌러 주세요.</td></tr>'; return; }
+  tb.innerHTML = `<thead><tr><th>학번</th><th>이름</th><th>상태</th><th>마지막 로그인</th><th></th></tr></thead><tbody>` +
+    res.students.map((s) => `<tr class="${s.active ? "" : "off"}" data-no="${esc(s.student_no)}">
+      <td>${esc(s.student_no)}</td><td>${esc(s.student_name)}</td>
+      <td>${!s.active ? '<span class="chip">사용 중지</span>' : s.must_change_pw ? '<span class="chip wait">처음 비밀번호</span>' : '<span class="chip done">사용 중</span>'}</td>
+      <td>${kst(s.last_sign_in_at)}</td>
+      <td><span class="acts"><button class="btn" type="button" data-a="reset">비밀번호 초기화</button><button class="btn" type="button" data-a="${s.active ? "off" : "on"}">${s.active ? "사용 중지" : "다시 사용"}</button></span></td>
+    </tr>`).join("") + "</tbody>";
 }
-function genPassword() {
-  const words = ["sun", "tree", "book", "cloud", "river", "star", "apple", "wind", "rain", "leaf"];
-  const a = new Uint32Array(3); crypto.getRandomValues(a);
-  return `${words[a[0] % words.length]}-${1000 + (a[1] % 9000)}-${words[a[2] % words.length]}`;
+function showIssued(rows, note = "") {
+  issued = rows;
+  $("#issued").hidden = !rows.length && !note;
+  $("#issued-table").innerHTML = rows.length ? `<thead><tr><th>학번</th><th>이름</th><th>아이디</th><th>처음 비밀번호</th></tr></thead><tbody>` +
+    rows.map((r) => `<tr><td>${esc(r.student_no)}</td><td>${esc(r.student_name)}</td><td>${esc(r.student_no)}</td><td class="pw">${esc(r.password)}</td></tr>`).join("") + "</tbody>" : "";
+  showErr($("#issued-note"), note);
 }
 
 // ---------- 이벤트 ----------
@@ -313,21 +341,41 @@ $("#login-form").addEventListener("submit", async (e) => {
   const btn = $("#l-btn"); btn.disabled = true; showErr($("#l-err"), "");
   const { error } = await sb.auth.signInWithPassword({ email: toEmail($("#l-email").value), password: $("#l-pw").value });
   btn.disabled = false;
-  if (error) { showErr($("#l-err"), "아이디(이메일)나 비밀번호가 맞지 않아요."); return; }
+  if (error) { showErr($("#l-err"), "아이디(학번 또는 이메일)나 비밀번호가 맞지 않아요."); return; }
   $("#l-pw").value = ""; route();
 });
-$("#logout").addEventListener("click", async () => { await sb.auth.signOut(); role = null; document.body.classList.remove("role-student"); route(); });
-$("#stu-gen").addEventListener("click", () => { $("#stu-pw").value = genPassword(); $("#stu-pw").select(); });
-$("#stu-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const pw = $("#stu-pw").value.trim(), btn = $("#stu-btn");
-  if (pw.length < 8) return toast("비밀번호는 8자 이상이어야 해요.");
-  btn.disabled = true; btn.textContent = "저장 중…";
-  const res = await callStudentAccount({ action: "set_password", password: pw });
-  btn.disabled = false; btn.textContent = "비밀번호 정하기";
-  if (!res?.ok) return toast(res?.message || "저장하지 못했어요.");
-  toast(`${res.message} 학생들에게 아이디 student, 비밀번호 ${pw}를 알려 주세요.`);
-  loadStudentAccount();
+$("#logout").addEventListener("click", async () => { await sb.auth.signOut(); role = null; me = null; document.body.classList.remove("role-student"); showIssued([]); route(); });
+$("#stu-sync").addEventListener("click", async (e) => {
+  const btn = e.currentTarget; btn.disabled = true; btn.textContent = "만드는 중…";
+  const res = await callStudentAccount({ action: "sync_from_roster" });
+  btn.disabled = false; btn.textContent = "명단에서 계정 만들기";
+  if (!res?.ok) return toast(res?.message || "계정을 만들지 못했어요.");
+  const notes = [];
+  if (res.failed?.length) notes.push(`만들지 못한 학생: ${res.failed.join(", ")}`);
+  if (res.without_id?.length) notes.push(`학번이 없어서 건너뛴 이름: ${res.without_id.slice(0, 5).join(", ")}${res.without_id.length > 5 ? " 등" : ""}`);
+  if (res.renamed?.length) notes.push(`이름이 바뀐 학생: ${res.renamed.join(", ")}`);
+  showIssued(res.created || [], notes.join(" · "));
+  toast(res.created?.length ? `계정 ${res.created.length}개를 만들었어요.` : "새로 만들 계정이 없어요.");
+  loadStudents();
+});
+$("#stu-table").addEventListener("click", async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  const no = b.closest("tr").dataset.no; b.disabled = true;
+  if (b.dataset.a === "reset") {
+    const res = await callStudentAccount({ action: "reset_password", student_no: no });
+    if (!res?.ok) { b.disabled = false; return toast(res?.message || "초기화하지 못했어요."); }
+    showIssued([{ student_no: res.student_no, student_name: res.student_name, password: res.password }]);
+    toast(`${res.student_no} ${res.student_name} 비밀번호를 초기화했어요.`);
+  } else {
+    const res = await callStudentAccount({ action: "set_active", student_no: no, active: b.dataset.a === "on" });
+    toast(res?.message || "처리하지 못했어요.");
+  }
+  loadStudents();
+});
+$("#issued-copy").addEventListener("click", async () => {
+  const text = ["학번\t이름\t아이디\t처음 비밀번호", ...issued.map((r) => `${r.student_no}\t${r.student_name}\t${r.student_no}\t${r.password}`)].join("\n");
+  try { await navigator.clipboard.writeText(text); toast("복사했어요. 엑셀이나 한글에 붙여넣을 수 있어요."); }
+  catch { const r = document.createRange(); r.selectNodeContents($("#issued-table")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast("표를 선택했어요. Ctrl+C로 복사해 주세요."); }
 });
 $("#chpw").addEventListener("click", () => { resetMode = true; route(); });
 
@@ -337,7 +385,7 @@ sb.auth.onAuthStateChange((event) => {
 $("#forgot").addEventListener("click", async () => {
   const email = toEmail($("#l-email").value), err = $("#l-err");
   if (!email) { showErr(err, "위에 선생님 이메일을 먼저 적고 다시 눌러 주세요."); $("#l-email").focus(); return; }
-  if (email === STUDENT_EMAIL || !email.includes("@")) { showErr(err, "학생 담당 비밀번호는 담당 선생님께 다시 받아 주세요."); return; }
+  if (!email.includes("@") || email.endsWith("@example.com")) { showErr(err, "학생은 담당 선생님께 비밀번호 초기화를 부탁해 주세요."); return; }
   const btn = $("#forgot"); btn.disabled = true;
   const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
   btn.disabled = false;
@@ -355,6 +403,7 @@ $("#reset-form").addEventListener("submit", async (e) => {
   const { error } = await sb.auth.updateUser({ password: a });
   btn.disabled = false;
   if (error) { showErr(err, /different|same/i.test(error.message) ? "지금 쓰는 비밀번호와 다른 비밀번호를 정해 주세요." : "비밀번호를 바꾸지 못했어요. 8자 이상인지 확인해 주세요."); return; }
+  await sb.rpc("mark_password_changed");
   e.target.reset(); showErr(err, ""); resetMode = false;
   history.replaceState(null, "", location.pathname + "#admin");
   toast("비밀번호를 바꿨어요."); route();

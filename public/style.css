@@ -142,3 +142,15 @@ details.weekly .roster-in{margin-top:12px}
 .stu-row input{font-family:var(--f-mono)}
 .role-chip{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--ink-soft);color:var(--ink);margin-left:6px}
 body.role-student .teacher-only{display:none!important}
+.tbl{overflow-x:auto}
+.tbl table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+.tbl th,.tbl td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl th{font-size:12px;color:var(--muted);font-weight:500}
+.tbl td.pw{font-family:var(--f-mono);font-weight:500}
+.tbl tr.off td{color:var(--muted)}
+.tbl .acts{display:flex;gap:6px}
+.tbl .btn{padding:5px 9px;font-size:12.5px}
+.issued{border:2px solid var(--tag);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--surface)}
+.issued-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.chip.wait{background:var(--warn-soft);color:var(--warn)}
+.whoby{font-size:12px;color:var(--muted)}

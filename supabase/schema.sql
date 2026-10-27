@@ -85,3 +85,12 @@ revoke all on public.app_config from anon, authenticated;
 alter table public.staff add column role text not null default 'teacher' check (role in ('teacher','student'));
 -- my_role(), is_teacher() 함수와 정책: 삭제는 선생님 전체·학생은 오늘 올린 물건만, 요일 명단 수정과 담당자 목록 보기는 선생님만
 -- revoke_user_sessions(uid): 학생 계정 비밀번호 변경 시 기존 로그인 해제 (service_role 전용)
+
+-- 담당 학생 개인 계정
+alter table public.staff add column student_no text unique, add column student_name text,
+  add column active boolean not null default true, add column must_change_pw boolean not null default false;
+-- my_profile(), mark_password_changed(), my_role()/is_staff()는 active인 계정만 인정
+-- items.uploader: 트리거 set_uploader가 "학번 이름" 또는 "선생님"으로 기록
+-- 학생용(anon)에는 uploader·created_by 열을 보이지 않음:
+revoke select on public.items from anon;
+grant select (id, name, description, category, place, received_on, photo_path, claimed, created_at) on public.items to anon;
