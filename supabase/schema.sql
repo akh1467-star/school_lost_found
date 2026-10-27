@@ -36,12 +36,17 @@ create policy "staff insert" on public.items for insert to authenticated with ch
 create policy "staff update" on public.items for update to authenticated using (public.is_staff()) with check (public.is_staff());
 create policy "staff delete" on public.items for delete to authenticated using (public.is_staff());
 
--- 요일별 담당 명단 (1=월 … 5=금), 담당자만 열람
-create table public.roster (weekday smallint primary key check (weekday between 1 and 5), names text[] not null default '{}', updated_at timestamptz not null default now());
+-- 교무실별 요일 담당 명단 (1=월 … 5=금), 담당자만 열람
+create table public.roster (
+  place text not null check (place in ('1학년 1교무실','1학년 2교무실','2학년 1교무실','2학년 2교무실','3학년 교무실')),
+  weekday smallint not null check (weekday between 1 and 5),
+  names text[] not null default '{}',
+  updated_at timestamptz not null default now(),
+  primary key (place, weekday)
+);
 alter table public.roster enable row level security;
 create policy "staff read roster" on public.roster for select to authenticated using (public.is_staff());
 create policy "staff write roster" on public.roster for all to authenticated using (public.is_staff()) with check (public.is_staff());
-insert into public.roster (weekday) values (1),(2),(3),(4),(5);
 
 -- 사진 저장소
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

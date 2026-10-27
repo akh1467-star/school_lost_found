@@ -79,7 +79,12 @@ function renderGrid() {
 }
 
 // ---------- 담당자용 ----------
-let adminItems = [], roster = {}, photoBlob = null;
+// roster[place][weekday] = [이름…]
+let adminItems = [], roster = {}, rPlace = PLACES[0], photoBlob = null;
+const normPlace = (s) => {
+  const k = String(s).replace(/\s/g, "").replace(/^(\d)-(\d)$/, "$1학년$2교무실").replace(/^3학년$/, "3학년교무실");
+  return PLACES.find((p) => p.replace(/\s/g, "") === k) || null;
+};
 
 async function loadAdmin() {
   const [{ data: its, error: e1 }, { data: ros }] = await Promise.all([
@@ -88,7 +93,7 @@ async function loadAdmin() {
   ]);
   if (e1) { toast("목록을 불러오지 못했어요."); return; }
   adminItems = its;
-  roster = {}; (ros || []).forEach((r) => (roster[r.weekday] = r.names || []));
+  roster = {}; (ros || []).forEach((r) => ((roster[r.place] ||= {})[r.weekday] = r.names || []));
   renderList(); renderDuty();
   $("#roster-text").value = rosterToText();
 }
@@ -101,36 +106,52 @@ function renderList() {
       <div class="b" data-id="${it.id}">${it.claimed ? '<span class="chip done">주인 찾음</span>' : '<button class="btn" type="button" data-a="done">주인 찾음</button><button class="btn danger" type="button" data-a="del">삭제</button>'}</div>
     </div>`).join("") : '<p class="note">보관 중인 물건이 없어요.</p>';
 }
+const namesFor = (place, wd) => roster[place]?.[wd] || [];
 function renderDuty() {
-  const t = todayKST(), wd = weekday(t), names = roster[wd] || [];
-  $("#duty").innerHTML = `<span>${fmt(t)} 오늘 담당</span>` +
+  const t = todayKST(), wd = weekday(t), place = $("#f-place").value, names = namesFor(place, wd);
+  $("#duty").innerHTML = `<span>${fmt(t)} ${esc(place)} 담당</span>` +
     (wd < 1 || wd > 5 ? '<span class="none">주말에는 담당자가 없어요</span>'
-      : names.length ? `<span class="who">${names.map(esc).join(", ")}</span>` : '<span class="none">이 요일 명단이 비어 있어요. 아래에서 명단을 올려 주세요.</span>');
-  $("#roster-grid").innerHTML = [1, 2, 3, 4, 5].map((i) => `<div class="day${i === wd ? " today" : ""}"><span class="dn">${WD[i]}${i === wd ? " · 오늘" : ""}</span><span class="nm${roster[i]?.length ? "" : " empty-n"}">${roster[i]?.length ? roster[i].map(esc).join(", ") : "미등록"}</span></div>`).join("");
+      : names.length ? `<span class="who">${names.map(esc).join(", ")}</span>` : '<span class="none">이 교무실의 오늘 명단이 비어 있어요. 아래에서 명단을 올려 주세요.</span>');
+  $("#r-places").innerHTML = PLACES.map((p) => {
+    const n = [1, 2, 3, 4, 5].filter((w) => namesFor(p, w).length).length;
+    return `<button type="button" aria-pressed="${p === rPlace}" data-p="${p}">${p}<span class="n">${n}/5</span></button>`;
+  }).join("");
+  $("#roster-grid").innerHTML = [1, 2, 3, 4, 5].map((i) => {
+    const nm = namesFor(rPlace, i);
+    return `<div class="day${i === wd ? " today" : ""}"><span class="dn">${WD[i]}${i === wd ? " · 오늘" : ""}</span><span class="nm${nm.length ? "" : " empty-n"}">${nm.length ? nm.map(esc).join(", ") : "미등록"}</span></div>`;
+  }).join("");
+  $("#r-label").textContent = `${rPlace} 명단 (엑셀에서 복사해 붙여넣어도 됩니다)`;
 }
-function rosterToText() { return [1, 2, 3, 4, 5].map((i) => `${WD[i]}, ${(roster[i] || []).join(", ")}`).join("\n"); }
+function rosterToText() { return [1, 2, 3, 4, 5].map((i) => `${WD[i]}, ${namesFor(rPlace, i).join(", ")}`).join("\n"); }
+// 줄 형식: "월, 이름…" (선택한 교무실) 또는 "1학년 1교무실, 월, 이름…"
 function parseRoster(text) {
   const out = {}, bad = [];
   text.split(/\r?\n/).forEach((line) => {
-    const cells = line.split(/[,\t;]+/).map((s) => s.trim().replace(/^"|"$/g, "")).filter(Boolean);
+    let cells = line.split(/[,\t;]+/).map((s) => s.trim().replace(/^"|"$/g, "")).filter(Boolean);
+    if (!cells.length) return;
+    let place = normPlace(cells[0]);
+    if (place) cells = cells.slice(1); else place = rPlace;
     if (!cells.length) return;
     let first = cells[0], rest = cells.slice(1);
     if (!rest.length && /\s/.test(first)) { const p = first.split(/\s+/); first = p[0]; rest = p.slice(1); }
     const i = WD.indexOf(first.replace(/요일$/, "").charAt(0));
-    if (i < 1 || i > 5) { if (!/^요일/.test(first)) bad.push(line.trim()); return; }
-    out[i] = [...(out[i] || []), ...rest];
+    if (i < 1 || i > 5) { if (!/^(요일|교무실|장소)/.test(first)) bad.push(line.trim()); return; }
+    ((out[place] ||= {})[i] ||= []).push(...rest);
   });
   return { out, bad };
 }
 async function saveRoster(text) {
-  const { out, bad } = parseRoster(text), err = $("#roster-err");
-  if (!Object.keys(out).length) { showErr(err, '요일을 찾지 못했어요. 각 줄을 "월, 이름"처럼 요일로 시작해 주세요.'); return; }
-  const rows = [1, 2, 3, 4, 5].map((w) => ({ weekday: w, names: out[w] || [], updated_at: new Date().toISOString() }));
+  const { out, bad } = parseRoster(text), err = $("#roster-err"), places = Object.keys(out);
+  if (!places.length) { showErr(err, '요일을 찾지 못했어요. 각 줄을 "월, 이름" 또는 "1학년 1교무실, 월, 이름"처럼 적어 주세요.'); return; }
+  const now = new Date().toISOString();
+  const rows = places.flatMap((p) => [1, 2, 3, 4, 5].map((w) => ({ place: p, weekday: w, names: out[p][w] || [], updated_at: now })));
   const { error } = await sb.from("roster").upsert(rows);
   if (error) { showErr(err, "명단을 저장하지 못했어요. 다시 로그인한 뒤 시도해 주세요."); return; }
-  roster = out;
-  showErr(err, bad.length ? `요일을 알 수 없는 줄 ${bad.length}개는 건너뛰었어요: ${bad.slice(0, 2).join(" / ")}` : "");
-  $("#roster-text").value = rosterToText(); renderDuty(); toast("명단을 저장했어요.");
+  places.forEach((p) => (roster[p] = out[p]));
+  if (!places.includes(rPlace)) rPlace = places[0];
+  showErr(err, bad.length ? `알아볼 수 없는 줄 ${bad.length}개는 건너뛰었어요: ${bad.slice(0, 2).join(" / ")}` : "");
+  $("#roster-text").value = rosterToText(); renderDuty();
+  toast(places.length > 1 ? `교무실 ${places.length}곳 명단을 저장했어요.` : `${places[0]} 명단을 저장했어요.`);
 }
 
 // 사진은 가로 1000px 이하 JPEG로 줄여서 올림 (저장 공간 절약)
@@ -238,6 +259,11 @@ $("#list").addEventListener("click", async (e) => {
     if (error) return toast("삭제하지 못했어요. 다시 시도해 주세요.");
     toast("삭제했어요."); loadAdmin();
   } else if (b.dataset.a === "no") renderList();
+});
+$("#f-place").addEventListener("change", renderDuty);
+$("#r-places").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  rPlace = b.dataset.p; showErr($("#roster-err"), ""); $("#roster-text").value = rosterToText(); renderDuty();
 });
 $("#roster-apply").addEventListener("click", () => saveRoster($("#roster-text").value));
 $("#roster-file").addEventListener("change", (e) => {
