@@ -136,6 +136,11 @@
   <footer>세교중학교 학생자치회 · 분실물함 위치: 1학년 앞반 교무실, 1학년 뒷반 교무실, 2학년 본관 교무실, 2학년 모듈러 교무실, 3학년 교무실 · <a href="#admin" id="nav">담당자 페이지</a></footer>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="사진 크게 보기">
+  <button type="button" class="lb-close" id="lb-close" aria-label="닫기"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  <img id="lb-img" alt="">
+  <p id="lb-cap"></p>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>

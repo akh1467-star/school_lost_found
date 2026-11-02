@@ -50,7 +50,33 @@ function chip(it) {
   return `<span class="chip">폐기까지 ${n}일</span>`;
 }
 const photoUrl = (p) => sb.storage.from("photos").getPublicUrl(p).data.publicUrl;
-const pic = (it) => it.photo_path ? `<img src="${esc(photoUrl(it.photo_path))}" alt="${esc(it.name)} 사진" loading="lazy">` : (ICON[it.category] || ICON.etc);
+// 사진은 누르면 크게 보이는 버튼으로 감쌈
+const pic = (it) => {
+  if (!it.photo_path) return ICON[it.category] || ICON.etc;
+  const url = esc(photoUrl(it.photo_path)), name = esc(it.name);
+  return `<button type="button" class="zoom" data-src="${url}" data-name="${name}" data-place="${esc(it.place)}" aria-label="${name} 사진 크게 보기"><img src="${url}" alt="${name} 사진" loading="lazy"></button>`;
+};
+
+// ---------- 사진 크게 보기 ----------
+let lbReturn = null;
+function openLightbox(btn) {
+  lbReturn = btn;
+  $("#lb-img").src = btn.dataset.src; $("#lb-img").alt = btn.dataset.name + " 사진";
+  $("#lb-cap").textContent = `${btn.dataset.name} · ${btn.dataset.place}`;
+  $("#lightbox").hidden = false; document.body.style.overflow = "hidden";
+  $("#lb-close").focus();
+}
+function closeLightbox() {
+  $("#lightbox").hidden = true; document.body.style.overflow = "";
+  $("#lb-img").removeAttribute("src");
+  if (lbReturn) { lbReturn.focus(); lbReturn = null; }
+}
+document.addEventListener("click", (e) => {
+  const z = e.target.closest("button.zoom");
+  if (z) { e.preventDefault(); e.stopPropagation(); openLightbox(z); return; }
+  if (!$("#lightbox").hidden && (e.target.id === "lightbox" || e.target.closest("#lb-close"))) closeLightbox();
+}, true);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#lightbox").hidden) closeLightbox(); });
 
 function toast(t) { const el = $("#toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 2400); }
 function showErr(el, msg) { el.textContent = msg; el.hidden = !msg; }
