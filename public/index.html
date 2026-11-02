@@ -64,7 +64,7 @@
     <div class="admin">
       <div class="panel roster dispose">
         <h2 id="dispose-title">오늘 폐기할 물건</h2>
-        <p class="note">들어온 지 7일이 된 물건이에요. 하교 전에 분실물함에서 꺼내 폐기해 주세요. 사이트에서는 저녁 7시에 자동으로 지워져요. 보관 장소를 바꾸면 그 교무실 목록이 보여요.</p>
+        <p class="note">들어온 지 7일이 된 물건이에요. 하교 전에 분실물함에서 꺼내 폐기해 주세요. 사이트에서는 저녁 7시에 자동으로 지워져요. 아래 교무실 탭을 누르면 다른 교무실 목록도 볼 수 있어요.</p>
         <div class="dlist" id="dispose-list"></div>
         <p class="note" id="dispose-others"></p>
       </div>
@@ -81,7 +81,9 @@
         <p class="note">올린 물건은 7일 뒤 저녁 7시에 자동으로 삭제됩니다.</p>
       </form>
       <div class="panel">
-        <h2>보관 중인 물건 <span id="cnt" style="font-family:var(--f-mono);font-size:16px;color:var(--muted)"></span></h2>
+        <h2>교무실별 분실물</h2>
+        <div class="places" id="list-places" role="group" aria-label="목록을 볼 교무실"></div>
+        <p class="note" id="cnt"></p>
         <div class="list" id="list"></div>
       </div>
       <div class="panel roster">

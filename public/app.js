@@ -144,8 +144,11 @@ function renderSync() {
 }
 // 오늘(또는 그 전에) 폐기일이 된 물건: 저녁 7시 자동 삭제 전까지 목록에 남아 있음
 const isDisposeToday = (it) => !it.claimed && addDays(it.received_on, 7) <= todayKST();
+// 목록에서 보고 있는 교무실 (올리기의 '보관 장소'와 따로 움직임. 처음엔 같게 시작)
+let listPlace = null;
+const curPlace = () => listPlace || $("#f-place").value;
 function renderDispose() {
-  const place = $("#f-place").value;
+  const place = curPlace();
   const all = adminItems.filter(isDisposeToday);
   const here = all.filter((it) => it.place === place);
   const others = PLACES.filter((p) => p !== place).map((p) => [p, all.filter((it) => it.place === p).length]).filter(([, n]) => n);
@@ -164,15 +167,41 @@ function renderDispose() {
     ? "다른 교무실: " + others.map(([p, n]) => `<button class="linkbtn" type="button" data-p="${esc(p)}">${esc(p)} ${n}개</button>`).join(" · ")
     : "";
 }
-function renderList() {
-  $("#cnt").textContent = adminItems.filter((i) => !i.claimed).length + "개";
-  renderDispose();
-  $("#list").innerHTML = adminItems.length ? adminItems.map((it) => `
-    <div class="row">
+function itemRow(it) {
+  const tag = it.claimed ? "" : isDisposeToday(it) ? '<span class="chip soon">오늘 폐기</span>' : `<span class="chip">폐기까지 ${leftDays(it)}일</span>`;
+  return `
+    <div class="row${it.claimed ? " claimed" : ""}">
       <div class="th">${pic(it)}</div>
-      <div style="min-width:0"><div class="t">${esc(it.name)}</div><div class="s">${esc(it.place)} · ${fmt(it.received_on)} 입고 → ${fmt(addDays(it.received_on, 7))} 폐기</div>${isDisposeToday(it) ? '<span class="chip soon">오늘 폐기</span>' : ""}${it.uploader ? `<div class="whoby">올린 사람 ${esc(it.uploader)}</div>` : ""}</div>
+      <div style="min-width:0"><div class="t">${esc(it.name)}</div><div class="s">${fmt(it.received_on)} 입고 → ${fmt(addDays(it.received_on, 7))} 폐기</div>${tag}${it.uploader ? `<div class="whoby">올린 사람 ${esc(it.uploader)}</div>` : ""}</div>
       <div class="b" data-id="${it.id}">${it.claimed ? '<span class="chip done">주인 찾음</span>' : '<button class="btn" type="button" data-a="done">주인 찾음</button>' + (role === "teacher" || it.received_on === todayKST() ? '<button class="btn danger" type="button" data-a="del">삭제</button>' : "")}</div>
-    </div>`).join("") : '<p class="note">보관 중인 물건이 없어요.</p>';
+    </div>`;
+}
+function renderList() {
+  const place = curPlace();
+  const groups = (pl) => {
+    const xs = adminItems.filter((i) => i.place === pl);
+    return {
+      dispose: xs.filter(isDisposeToday),
+      keep: xs.filter((i) => !i.claimed && !isDisposeToday(i)).sort((a, b) => a.received_on.localeCompare(b.received_on)),
+      claimed: xs.filter((i) => i.claimed),
+    };
+  };
+  $("#list-places").innerHTML = PLACES.map((p) => {
+    const g = groups(p);
+    return `<button type="button" aria-pressed="${p === place}" data-p="${esc(p)}">${esc(p)}<span class="n">보관 ${g.keep.length}${g.dispose.length ? ` · <b class="warn-n">폐기 ${g.dispose.length}</b>` : ""}</span></button>`;
+  }).join("");
+  const g = groups(place);
+  $("#cnt").textContent = `${place} · 보관 ${g.keep.length}개${g.dispose.length ? ` · 오늘 폐기 ${g.dispose.length}개` : ""}`;
+  const section = (title, cls, xs, empty) => `
+    <div class="lsec ${cls}">
+      <p class="lsec-h">${title} <span>${xs.length}개</span></p>
+      ${xs.length ? xs.map(itemRow).join("") : `<p class="note">${empty}</p>`}
+    </div>`;
+  $("#list").innerHTML =
+    section("오늘 폐기할 물건", "lsec-dispose", g.dispose, "오늘 폐기할 물건이 없어요.") +
+    section("보관 중", "lsec-keep", g.keep, "보관 중인 물건이 없어요.") +
+    (g.claimed.length ? section("주인 찾음", "lsec-claimed", g.claimed, "") : "");
+  renderDispose();
 }
 const namesFor = (place, wd) => roster[place]?.[wd] || [];
 function renderDuty() {
@@ -322,7 +351,7 @@ function pickMyPlace() {
   const t = todayKST();
   for (const d of [t, ...schoolDays(addDays(t, 1), 5)]) {
     const p = PLACES.find((pl) => mine(dutyFor(pl, d).names));
-    if (p) { $("#f-place").value = p; rPlace = p; renderDuty(); if (d === t) toast(`오늘 ${p} 담당이에요.`); return; }
+    if (p) { $("#f-place").value = p; rPlace = p; listPlace = p; renderDuty(); renderList(); if (d === t) toast(`오늘 ${p} 담당이에요.`); return; }
   }
 }
 
@@ -486,10 +515,14 @@ $("#list").addEventListener("click", async (e) => {
     toast("삭제했어요."); loadAdmin();
   } else if (b.dataset.a === "no") renderList();
 });
-$("#f-place").addEventListener("change", () => { renderDuty(); renderDispose(); });
+$("#f-place").addEventListener("change", () => { listPlace = $("#f-place").value; renderDuty(); renderList(); });
 $("#dispose-others").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-p]"); if (!b) return;
-  $("#f-place").value = b.dataset.p; renderDuty(); renderDispose();
+  listPlace = b.dataset.p; renderList();
+});
+$("#list-places").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-p]"); if (!b) return;
+  listPlace = b.dataset.p; renderList();
 });
 $("#r-places").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
