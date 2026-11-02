@@ -43,8 +43,8 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
 
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
-.photo-box{aspect-ratio:4/3;max-width:100%;background:var(--ink-soft);display:grid;place-items:center;position:relative;color:var(--ink)}
-.photo-box img{width:100%;height:100%;object-fit:cover}
+.photo-box{aspect-ratio:4/3;max-width:100%;background:var(--ink-soft);display:grid;place-items:center;position:relative;color:var(--ink);overflow:hidden}
+.photo-box img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .photo-box svg{width:56px;height:56px}
 .photo-box .ex{position:absolute;left:8px;bottom:8px;font-size:11px;color:var(--muted);background:var(--surface);padding:1px 7px;border-radius:6px}
 .tag{position:absolute;top:10px;right:10px;background:var(--tag);color:var(--tag-ink);font-family:var(--f-mono);font-size:12px;padding:4px 10px 4px 18px;border-radius:4px 8px 8px 4px;clip-path:polygon(10px 0,100% 0,100% 100%,10px 100%,0 50%)}
