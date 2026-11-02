@@ -142,12 +142,35 @@ function renderSync() {
   el.textContent = `마지막 불러오기 ${when} · ${s.message}`;
   el.className = "sync-msg" + (s.ok ? "" : " bad");
 }
+// 오늘(또는 그 전에) 폐기일이 된 물건: 저녁 7시 자동 삭제 전까지 목록에 남아 있음
+const isDisposeToday = (it) => !it.claimed && addDays(it.received_on, 7) <= todayKST();
+function renderDispose() {
+  const place = $("#f-place").value;
+  const all = adminItems.filter(isDisposeToday);
+  const here = all.filter((it) => it.place === place);
+  const others = PLACES.filter((p) => p !== place).map((p) => [p, all.filter((it) => it.place === p).length]).filter(([, n]) => n);
+  $("#dispose-title").textContent = `${place} · 오늘 폐기할 물건 ${here.length}개`;
+  $("#dispose-list").innerHTML = here.length ? here.map((it) => `
+    <div class="dcard">
+      <div class="dph">${pic(it)}</div>
+      <div class="dbody">
+        <p class="t">${esc(it.name)}</p>
+        ${it.description ? `<p class="s">${esc(it.description)}</p>` : ""}
+        <p class="s">${fmt(it.received_on)} 입고</p>
+      </div>
+    </div>`).join("")
+    : '<p class="note">오늘 이 분실물함에서 폐기할 물건이 없어요.</p>';
+  $("#dispose-others").innerHTML = others.length
+    ? "다른 교무실: " + others.map(([p, n]) => `<button class="linkbtn" type="button" data-p="${esc(p)}">${esc(p)} ${n}개</button>`).join(" · ")
+    : "";
+}
 function renderList() {
   $("#cnt").textContent = adminItems.filter((i) => !i.claimed).length + "개";
+  renderDispose();
   $("#list").innerHTML = adminItems.length ? adminItems.map((it) => `
     <div class="row">
       <div class="th">${pic(it)}</div>
-      <div style="min-width:0"><div class="t">${esc(it.name)}</div><div class="s">${esc(it.place)} · ${fmt(it.received_on)} 입고 → ${fmt(addDays(it.received_on, 7))} 폐기</div>${it.uploader ? `<div class="whoby">올린 사람 ${esc(it.uploader)}</div>` : ""}</div>
+      <div style="min-width:0"><div class="t">${esc(it.name)}</div><div class="s">${esc(it.place)} · ${fmt(it.received_on)} 입고 → ${fmt(addDays(it.received_on, 7))} 폐기</div>${isDisposeToday(it) ? '<span class="chip soon">오늘 폐기</span>' : ""}${it.uploader ? `<div class="whoby">올린 사람 ${esc(it.uploader)}</div>` : ""}</div>
       <div class="b" data-id="${it.id}">${it.claimed ? '<span class="chip done">주인 찾음</span>' : '<button class="btn" type="button" data-a="done">주인 찾음</button>' + (role === "teacher" || it.received_on === todayKST() ? '<button class="btn danger" type="button" data-a="del">삭제</button>' : "")}</div>
     </div>`).join("") : '<p class="note">보관 중인 물건이 없어요.</p>';
 }
@@ -463,7 +486,11 @@ $("#list").addEventListener("click", async (e) => {
     toast("삭제했어요."); loadAdmin();
   } else if (b.dataset.a === "no") renderList();
 });
-$("#f-place").addEventListener("change", renderDuty);
+$("#f-place").addEventListener("change", () => { renderDuty(); renderDispose(); });
+$("#dispose-others").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-p]"); if (!b) return;
+  $("#f-place").value = b.dataset.p; renderDuty(); renderDispose();
+});
 $("#r-places").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   rPlace = b.dataset.p; showErr($("#roster-err"), ""); $("#roster-text").value = rosterToText(); renderDuty();

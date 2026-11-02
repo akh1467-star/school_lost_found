@@ -62,6 +62,12 @@
   <section id="v-adm" hidden style="flex-direction:column;gap:16px">
     <div class="topbar"><span id="who"></span><span class="btns"><button class="btn" id="chpw" type="button">비밀번호 바꾸기</button><button class="btn" id="logout" type="button">로그아웃</button></span></div>
     <div class="admin">
+      <div class="panel roster dispose">
+        <h2 id="dispose-title">오늘 폐기할 물건</h2>
+        <p class="note">들어온 지 7일이 된 물건이에요. 하교 전에 분실물함에서 꺼내 폐기해 주세요. 사이트에서는 저녁 7시에 자동으로 지워져요. 보관 장소를 바꾸면 그 교무실 목록이 보여요.</p>
+        <div class="dlist" id="dispose-list"></div>
+        <p class="note" id="dispose-others"></p>
+      </div>
       <form class="panel" id="form" autocomplete="off">
         <h2>분실물 올리기</h2>
         <div class="duty" id="duty"></div>
