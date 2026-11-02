@@ -5,7 +5,14 @@ import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 // 시트 주소는 서버 전용 테이블 app_config(key='roster_sheet_csv_url')에 저장합니다 (사이트 코드에 넣지 않음).
 // 시트 형식: 날짜 | 요일(선택) | 교무실 | 학번1 | 이름1 | 학번2 | 이름2 …
 
-const PLACES = ["1학년 1교무실", "1학년 2교무실", "2학년 1교무실", "2학년 2교무실", "3학년 교무실"];
+const PLACES = ["1학년 앞반 교무실", "1학년 뒷반 교무실", "2학년 본관 교무실", "2학년 모듈러 교무실", "3학년 교무실"];
+// 예전 이름·줄임말도 새 이름으로 알아봄 (구글 시트 등)
+const PLACE_ALIASES: Record<string, string> = {
+  "1학년1교무실": "1학년 앞반 교무실", "1학년2교무실": "1학년 뒷반 교무실", "2학년1교무실": "2학년 본관 교무실", "2학년2교무실": "2학년 모듈러 교무실",
+  "1-1": "1학년 앞반 교무실", "1-2": "1학년 뒷반 교무실", "2-1": "2학년 본관 교무실", "2-2": "2학년 모듈러 교무실",
+  "1학년앞반": "1학년 앞반 교무실", "1학년뒷반": "1학년 뒷반 교무실", "2학년본관": "2학년 본관 교무실", "2학년모듈러": "2학년 모듈러 교무실",
+  "3학년": "3학년 교무실", "3": "3학년 교무실",
+};
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -34,8 +41,8 @@ function parseCSV(text: string): string[][] {
 }
 
 const normPlace = (s: string) => {
-  const k = s.replace(/\s/g, "").replace(/^(\d)-(\d)$/, "$1학년$2교무실").replace(/^3학년$/, "3학년교무실");
-  return PLACES.find((p) => p.replace(/\s/g, "") === k) ?? null;
+  const k = s.replace(/\s/g, "");
+  return PLACES.find((p) => p.replace(/\s/g, "") === k) ?? PLACE_ALIASES[k] ?? PLACE_ALIASES[k.replace(/교무실$/, "")] ?? null;
 };
 
 function todayKST() {

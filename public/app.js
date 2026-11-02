@@ -1,6 +1,13 @@
 const sb = window.supabase.createClient(window.LF_CONFIG.url, window.LF_CONFIG.key);
 
-const PLACES = ["1학년 1교무실", "1학년 2교무실", "2학년 1교무실", "2학년 2교무실", "3학년 교무실"];
+const PLACES = ["1학년 앞반 교무실", "1학년 뒷반 교무실", "2학년 본관 교무실", "2학년 모듈러 교무실", "3학년 교무실"];
+// 예전 이름·줄임말도 새 이름으로 알아봄 (구글 시트 등)
+const PLACE_ALIASES = {
+  "1학년1교무실": "1학년 앞반 교무실", "1학년2교무실": "1학년 뒷반 교무실", "2학년1교무실": "2학년 본관 교무실", "2학년2교무실": "2학년 모듈러 교무실",
+  "1-1": "1학년 앞반 교무실", "1-2": "1학년 뒷반 교무실", "2-1": "2학년 본관 교무실", "2-2": "2학년 모듈러 교무실",
+  "1학년앞반": "1학년 앞반 교무실", "1학년뒷반": "1학년 뒷반 교무실", "2학년본관": "2학년 본관 교무실", "2학년모듈러": "2학년 모듈러 교무실",
+  "3학년": "3학년 교무실", "3": "3학년 교무실",
+};
 const CATS = { clothes: "옷·체육복", bottle: "물병·텀블러", stationery: "필기구·필통", book: "책·공책", bag: "가방·주머니", idcard: "학생증", card: "카드", accessory: "액세서리", cosmetic: "화장품", device: "이어폰·전자기기", umbrella: "우산", etc: "기타" };
 const NO_PHOTO = ["idcard", "card"];
 const WD = ["일", "월", "화", "수", "목", "금", "토"];
@@ -82,8 +89,8 @@ function renderGrid() {
 // roster[place][weekday] = [이름…]
 let adminItems = [], roster = {}, rPlace = PLACES[0], photoBlob = null;
 const normPlace = (s) => {
-  const k = String(s).replace(/\s/g, "").replace(/^(\d)-(\d)$/, "$1학년$2교무실").replace(/^3학년$/, "3학년교무실");
-  return PLACES.find((p) => p.replace(/\s/g, "") === k) || null;
+  const k = String(s).replace(/\s/g, "");
+  return PLACES.find((p) => p.replace(/\s/g, "") === k) || PLACE_ALIASES[k] || PLACE_ALIASES[k.replace(/교무실$/, "")] || null;
 };
 
 // dated[place][YYYY-MM-DD] = [이름…] (구글 시트에서 동기화된 날짜별 명단)
@@ -159,7 +166,7 @@ function renderDuty() {
   $("#r-label").textContent = `${rPlace} 명단 (엑셀에서 복사해 붙여넣어도 됩니다)`;
 }
 function rosterToText() { return [1, 2, 3, 4, 5].map((i) => `${WD[i]}, ${namesFor(rPlace, i).join(", ")}`).join("\n"); }
-// 줄 형식: "월, 이름…" (선택한 교무실) 또는 "1학년 1교무실, 월, 이름…"
+// 줄 형식: "월, 이름…" (선택한 교무실) 또는 "1학년 앞반 교무실, 월, 이름…"
 function parseRoster(text) {
   const out = {}, bad = [];
   text.split(/\r?\n/).forEach((line) => {
@@ -197,7 +204,7 @@ const personHTML = (s) => {
 };
 async function saveRoster(text) {
   const { out, bad } = parseRoster(text), err = $("#roster-err"), places = Object.keys(out);
-  if (!places.length) { showErr(err, '요일을 찾지 못했어요. 각 줄을 "월, 이름" 또는 "1학년 1교무실, 월, 이름"처럼 적어 주세요.'); return; }
+  if (!places.length) { showErr(err, '요일을 찾지 못했어요. 각 줄을 "월, 이름" 또는 "1학년 앞반 교무실, 월, 이름"처럼 적어 주세요.'); return; }
   const now = new Date().toISOString();
   const rows = places.flatMap((p) => [1, 2, 3, 4, 5].map((w) => ({ place: p, weekday: w, names: out[p][w] || [], updated_at: now })));
   const { error } = await sb.from("roster").upsert(rows);
